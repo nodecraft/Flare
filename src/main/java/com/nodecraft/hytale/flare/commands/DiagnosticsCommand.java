@@ -7,6 +7,12 @@ import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.metrics.metric.HistoricMetric;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.component.Store;
 import com.nodecraft.hytale.flare.monitoring.*;
 import com.nodecraft.hytale.flare.model.*;
 import com.nodecraft.hytale.flare.profiler.PerformanceProfiler;
@@ -16,6 +22,7 @@ import javax.annotation.Nonnull;
 import java.text.DecimalFormat;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
 
 public final class DiagnosticsCommand extends AbstractCommandCollection {
     private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.##");
@@ -59,6 +66,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         this.addSubCommand(new GcCommand());
         this.addSubCommand(new ThreadsCommand());
         this.addSubCommand(new TpsCommand());
+        this.addSubCommand(new WorldCommand());
         this.addSubCommand(new CpuCommand());
         this.addSubCommand(new NetworkCommand());
         this.addSubCommand(new ProfileCommand());
@@ -127,6 +135,21 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         @Override
         protected void executeSync(@Nonnull CommandContext context) {
             showTps(context);
+        }
+    }
+
+    private class WorldCommand extends CommandBase {
+        private final OptionalArg<String> worldArg =
+                this.withOptionalArg("world", "flare.commands.world.name", ArgTypes.STRING);
+
+        public WorldCommand() {
+            super("world", "Show world metrics (optionally for a specific world)");
+            this.setAllowsExtraArguments(true);
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext context) {
+            showWorld(context, worldArg);
         }
     }
 
@@ -218,6 +241,10 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
                     "TPS: %.2f (avg: %.2f, min: %.2f, max: %.2f)",
                     tps.currentTps(), tps.averageTps(), tps.minTps(), tps.maxTps()
             )));
+            String tickTimeSummary = formatTickTimeSummary();
+            if (tickTimeSummary != null) {
+                context.sendMessage(Message.raw(tickTimeSummary));
+            }
         }
 
         if (snapshot.threads() != null) {
@@ -337,17 +364,187 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         context.sendMessage(Message.raw(String.format("Min TPS: %.2f", tps.minTps())));
         context.sendMessage(Message.raw(String.format("Max TPS: %.2f", tps.maxTps())));
 
-        double avgTickNanos = tpsMonitor.getLastAvgTickNanos();
-        long tickStepNanos = tpsMonitor.getLastTickStepNanos();
-        if (avgTickNanos > 0.0 && tickStepNanos > 0L) {
-            double avgTickMs = avgTickNanos / 1_000_000.0;
-            double tickBudgetMs = tickStepNanos / 1_000_000.0;
-            context.sendMessage(Message.raw(String.format(
-                    "Avg Tick Time (10s): %.2f ms (target: %.2f ms)",
-                    avgTickMs,
-                    tickBudgetMs
-            )));
+        String tickTimeSummary = formatTickTimeSummary();
+        if (tickTimeSummary != null) {
+            context.sendMessage(Message.raw(tickTimeSummary));
         }
+
+        WorldMetrics worldMetrics = worldMonitor.collect();
+        if (worldMetrics != null && !worldMetrics.worlds().isEmpty()) {
+            context.sendMessage(Message.raw("World Tick (avg 10s):"));
+            var worldMap = Universe.get().getWorlds();
+            for (WorldSnapshot snapshot : worldMetrics.worlds()) {
+                String tickMs = formatTickTimeMs(snapshot.avgTickNanos());
+                String tpsInfo = "";
+                World world = worldMap.get(snapshot.name());
+                if (world != null && snapshot.avgTickNanos() > 0.0) {
+                    double worldTps = 1_000_000_000.0 / Math.max(snapshot.avgTickNanos(), world.getTickStepNanos());
+                    tpsInfo = String.format(", TPS %.2f", worldTps);
+                }
+                context.sendMessage(Message.raw(String.format(
+                        "  %s: %s%s",
+                        snapshot.name(),
+                        tickMs,
+                        tpsInfo
+                )));
+            }
+        }
+    }
+
+    private void showWorld(CommandContext context, OptionalArg<String> worldArg) {
+        WorldMetrics worldMetrics = worldMonitor.collect();
+        if (worldMetrics == null) {
+            context.sendMessage(Message.raw("World monitoring is disabled"));
+            return;
+        }
+
+        Map<String, World> worlds = Universe.get().getWorlds();
+        if (worlds.isEmpty()) {
+            context.sendMessage(Message.raw("No worlds found"));
+            return;
+        }
+
+        String requestedWorld = null;
+        if (worldArg != null && worldArg.provided(context)) {
+            requestedWorld = worldArg.get(context);
+        } else {
+            requestedWorld = parseTrailingWorld(context.getInputString());
+        }
+
+        if (requestedWorld == null || requestedWorld.isBlank()) {
+            context.sendMessage(Message.raw("=== World Summary ==="));
+            context.sendMessage(Message.raw(String.format(
+                    "Worlds: %d, Total Chunks: %d, Total Entities: %d",
+                    worldMetrics.worldCount(),
+                    worldMetrics.totalLoadedChunks(),
+                    worldMetrics.totalEntities()
+            )));
+            for (WorldSnapshot snapshot : worldMetrics.worlds()) {
+                context.sendMessage(Message.raw(String.format(
+                        "  %s: chunks %d, entities %d, tick %s, ticking %s, paused %s",
+                        snapshot.name(),
+                        snapshot.loadedChunks(),
+                        snapshot.entityCount(),
+                        formatTickTimeMs(snapshot.avgTickNanos()),
+                        snapshot.ticking() ? "yes" : "no",
+                        snapshot.paused() ? "yes" : "no"
+                )));
+            }
+            return;
+        }
+
+        World world = worlds.get(requestedWorld);
+        if (world == null) {
+            context.sendMessage(Message.raw(String.format("World not found: %s", requestedWorld)));
+            context.sendMessage(Message.raw(String.format("Available worlds: %s", String.join(", ", worlds.keySet()))));
+            return;
+        }
+
+        context.sendMessage(Message.raw(String.format("=== World: %s ===", world.getName())));
+        context.sendMessage(Message.raw(String.format("Ticking: %s", world.isTicking() ? "yes" : "no")));
+        context.sendMessage(Message.raw(String.format("Paused: %s", world.isPaused() ? "yes" : "no")));
+
+        ChunkStore chunkStore = world.getChunkStore();
+        context.sendMessage(Message.raw(String.format(
+                "Chunks: loaded %d, total loaded %d, total generated %d",
+                chunkStore.getLoadedChunksCount(),
+                chunkStore.getTotalLoadedChunksCount(),
+                chunkStore.getTotalGeneratedChunksCount()
+        )));
+
+        Store<EntityStore> entityStore = world.getEntityStore().getStore();
+        context.sendMessage(Message.raw(String.format(
+                "Entities: %d (archetype chunks %d)",
+                entityStore.getEntityCount(),
+                entityStore.getArchetypeChunkCount()
+        )));
+
+        long tickStepNanos = world.getTickStepNanos();
+        HistoricMetric metrics = world.getBufferedTickLengthMetricSet();
+        if (metrics == null) {
+            context.sendMessage(Message.raw("Tick Metrics: unavailable"));
+            return;
+        }
+
+        double avg1s = computeWindowAverage(metrics, 1_000_000_000L);
+        double avg10s = getAverageSafe(metrics, 0);
+        double avg1m = getAverageSafe(metrics, 1);
+        double avg5m = getAverageSafe(metrics, 2);
+        long min10s = metrics.calculateMin(0);
+        long max10s = metrics.calculateMax(0);
+
+        context.sendMessage(Message.raw(String.format(
+                "Tick Time Avg: 1s %s, 10s %s, 1m %s, 5m %s (target: %.2f ms)",
+                formatTickTimeMs(avg1s),
+                formatTickTimeMs(avg10s),
+                formatTickTimeMs(avg1m),
+                formatTickTimeMs(avg5m),
+                tickStepNanos / 1_000_000.0
+        )));
+        context.sendMessage(Message.raw(String.format(
+                "Tick Time 10s Min/Max: %s / %s",
+                formatTickTimeMs(min10s),
+                formatTickTimeMs(max10s)
+        )));
+    }
+
+    private String formatTickTimeSummary() {
+        long tickStepNanos = tpsMonitor.getLastTickStepNanos();
+        if (tickStepNanos <= 0L) {
+            return null;
+        }
+
+        double avg1s = tpsMonitor.getLastTickAvg1sNanos();
+        double avg10s = tpsMonitor.getLastTickAvg10sNanos();
+        double avg1m = tpsMonitor.getLastTickAvg1mNanos();
+        double avg5m = tpsMonitor.getLastTickAvg5mNanos();
+
+        return String.format(
+                "Avg Tick Time: 1s %s, 10s %s, 1m %s, 5m %s (target: %.2f ms)",
+                formatTickTimeMs(avg1s),
+                formatTickTimeMs(avg10s),
+                formatTickTimeMs(avg1m),
+                formatTickTimeMs(avg5m),
+                tickStepNanos / 1_000_000.0
+        );
+    }
+
+    private String formatTickTimeMs(double nanos) {
+        if (nanos <= 0.0) {
+            return "n/a";
+        }
+        return String.format("%.2f ms", nanos / 1_000_000.0);
+    }
+
+    private static double getAverageSafe(HistoricMetric metrics, int index) {
+        long[] periods = metrics.getPeriodsNanos();
+        if (periods == null || index < 0 || index >= periods.length) {
+            return 0.0;
+        }
+        return metrics.getAverage(index);
+    }
+
+    private static double computeWindowAverage(HistoricMetric metrics, long windowNanos) {
+        long[] timestamps = metrics.getAllTimestamps();
+        long[] values = metrics.getAllValues();
+        if (timestamps.length == 0 || values.length == 0) {
+            return 0.0;
+        }
+
+        long latest = timestamps[timestamps.length - 1];
+        long cutoff = latest - windowNanos;
+        long sum = 0L;
+        int count = 0;
+
+        for (int i = timestamps.length - 1; i >= 0; i--) {
+            if (timestamps[i] < cutoff) {
+                break;
+            }
+            sum += values[i];
+            count++;
+        }
+
+        return count > 0 ? sum / (double) count : 0.0;
     }
 
     private void showCpu(CommandContext context) {
@@ -457,6 +654,21 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private String parseTrailingWorld(String input) {
+        if (input == null || input.isBlank()) {
+            return null;
+        }
+        String[] parts = input.trim().split("\\s+");
+        if (parts.length < 3) {
+            return null;
+        }
+        String last = parts[parts.length - 1];
+        if (last.startsWith("--")) {
+            return null;
+        }
+        return last;
     }
 
     private void stopProfile(CommandContext context) {

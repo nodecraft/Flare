@@ -39,6 +39,8 @@ public class FlarePlugin extends JavaPlugin {
 
     @Override
     protected void setup() {
+        // Save the config first, this'll generate a default
+        this._config.save();
         this.config = this._config.get();
 
         // Initialize monitors
@@ -52,7 +54,7 @@ public class FlarePlugin extends JavaPlugin {
 
         // Initialize profiler
         // Profiles will be stored in mods/Flare/profiles/
-        Path profilesDirectory = java.nio.file.Paths.get("mods", "Flare", "profiles");
+        Path profilesDirectory = java.nio.file.Paths.get("mods", "Nodecraft_Flare", "profiles");
         String pluginVersion = getManifest().getVersion() != null 
                 ? getManifest().getVersion().toString() 
                 : "unknown";
