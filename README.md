@@ -2,6 +2,10 @@
 
 A comprehensive performance monitoring and profiling plugin for Hytale servers that provides real-time diagnostics and historical profiling data.
 
+## Note
+
+This project is still in early stages, much like Hytale. Things may not work properly, and there may be some bugs.
+
 ## Features
 
 ### Real-Time Monitoring
@@ -22,7 +26,7 @@ A comprehensive performance monitoring and profiling plugin for Hytale servers t
 
 1. Build the plugin:
    ```bash
-   ./gradlew shadowJar
+   ./gradlew build
    ```
 
 2. Place the generated JAR file from `build/libs/` into your server's `mods/` folder.
@@ -103,6 +107,26 @@ The plugin can be configured via a JSON configuration file at `mods/Flare/config
 ### Prerequisites
 - Java 25 JDK
 - Gradle 8.5+ (or use the included Gradle wrapper)
+- HytaleServer JAR file
+
+### Setting Up HytaleServer Dependency
+
+The HytaleServer API is not available in public Maven repositories. You need to provide it locally:
+
+**Option 1: Place JAR in libs/ directory (Recommended)**
+1. Obtain `HytaleServer.jar` from your Hytale server installation
+2. Place it in the `libs/` directory: `libs/HytaleServer.jar`
+3. The build will automatically use this local JAR
+
+**Option 2: Install to Local Maven Repository**
+```bash
+mvn install:install-file \
+  -Dfile=HytaleServer.jar \
+  -DgroupId=com.hypixel.hytale \
+  -DartifactId=HytaleServer-parent \
+  -Dversion=1.0-SNAPSHOT \
+  -Dpackaging=jar
+```
 
 ### Build Commands
 

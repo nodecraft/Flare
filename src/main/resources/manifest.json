@@ -1,0 +1,15 @@
+{
+  "Group": "Nodecraft",
+  "Name": "Flare",
+  "Version": "${project.version}",
+  "Authors": [
+    {
+      "Name": "Matt Artist",
+      "Email": "matt.a@nodecraft.com",
+      "Url": "https://www.nodecraft.com"
+    }
+  ],
+  "Website": "https://www.nodecraft.com",
+  "Main": "com.nodecraft.hytale.performance_diagnostics.PerformanceDiagnosticsPlugin",
+  "ServerVersion": "*"
+}
