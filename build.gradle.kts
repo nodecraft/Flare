@@ -109,27 +109,6 @@ tasks {
 }
 
 // IDEA run configuration for HytaleServer
-//idea {
-//    project {
-//        settings {
-//            runConfigurations {
-//                create("HytaleServer", Application::class.java) {
-//                    mainClass = "com.hypixel.hytale.Main"
-//                    val assetsPath = when {
-//                        System.getProperty("os.name").lowercase().contains("windows") -> {
-//                            "$hytaleHome\\install\\release\\package\\game\\latest\\Assets.zip"
-//                        }
-//                        else -> {
-//                            "$hytaleHome/install/release/package/game/latest/Assets.zip"
-//                        }
-//                    }
-//                    programParameters = "--allow-op --assets=$assetsPath --accept-early-plugins"
-//                    workingDirectory = serverRunDir.absolutePath
-//                }
-//            }
-//        }
-//    }
-//}
 idea {
     project {
         settings {

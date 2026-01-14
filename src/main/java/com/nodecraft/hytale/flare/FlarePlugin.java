@@ -1,15 +1,21 @@
 package com.nodecraft.hytale.flare;
 
+import java.nio.file.Path;
+
+import javax.annotation.Nonnull;
+
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.util.Config;
 import com.nodecraft.hytale.flare.commands.DiagnosticsCommand;
 import com.nodecraft.hytale.flare.config.FlareConfig;
-import com.nodecraft.hytale.flare.monitoring.*;
+import com.nodecraft.hytale.flare.monitoring.CpuMonitor;
+import com.nodecraft.hytale.flare.monitoring.GcMonitor;
+import com.nodecraft.hytale.flare.monitoring.HeapMonitor;
+import com.nodecraft.hytale.flare.monitoring.ThreadMonitor;
+import com.nodecraft.hytale.flare.monitoring.TpsMonitor;
+import com.nodecraft.hytale.flare.monitoring.WorldMonitor;
 import com.nodecraft.hytale.flare.profiler.PerformanceProfiler;
-
-import javax.annotation.Nonnull;
-import java.nio.file.Path;
 
 public class FlarePlugin extends JavaPlugin {
 
@@ -21,6 +27,7 @@ public class FlarePlugin extends JavaPlugin {
     private ThreadMonitor threadMonitor;
     private TpsMonitor tpsMonitor;
     private CpuMonitor cpuMonitor;
+    private WorldMonitor worldMonitor;
     private PerformanceProfiler profiler;
     private DiagnosticsCommand diagnosticsCommand;
 
@@ -38,6 +45,7 @@ public class FlarePlugin extends JavaPlugin {
         this.threadMonitor = new ThreadMonitor(config.getThreadMonitorConfig());
         this.tpsMonitor = new TpsMonitor(config.getTpsMonitorConfig());
         this.cpuMonitor = new CpuMonitor(config.getCpuMonitorConfig());
+        this.worldMonitor = new WorldMonitor(config.getWorldMonitorConfig());
 
         // Initialize profiler
         // Profiles will be stored in mods/Flare/profiles/
@@ -53,6 +61,7 @@ public class FlarePlugin extends JavaPlugin {
                 threadMonitor,
                 tpsMonitor,
                 cpuMonitor,
+                worldMonitor,
                 profilesDirectory,
                 pluginVersion
         );
@@ -65,6 +74,7 @@ public class FlarePlugin extends JavaPlugin {
                 threadMonitor,
                 tpsMonitor,
                 cpuMonitor,
+                worldMonitor,
                 profiler
         );
 

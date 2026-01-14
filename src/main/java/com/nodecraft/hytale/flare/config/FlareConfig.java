@@ -26,9 +26,14 @@ public class FlareConfig {
                     config -> config.tpsMonitorConfig
             ).add()
             .append(
-                    new KeyedCodec<>("CpuMonitor", MonitorConfig.CODEC),
+                    new KeyedCodec<>("CpuMonitor", MonitorConfig.CODEC),        
                     (config, value) -> config.cpuMonitorConfig = value,
                     config -> config.cpuMonitorConfig
+            ).add()
+            .append(
+                    new KeyedCodec<>("WorldMonitor", MonitorConfig.CODEC),
+                    (config, value) -> config.worldMonitorConfig = value,
+                    config -> config.worldMonitorConfig
             ).add()
             .append(
                     new KeyedCodec<>("Profiler", ProfilerConfig.CODEC),
@@ -42,6 +47,7 @@ public class FlareConfig {
     private MonitorConfig threadMonitorConfig = new MonitorConfig();
     private MonitorConfig tpsMonitorConfig = new MonitorConfig();
     private MonitorConfig cpuMonitorConfig = new MonitorConfig();
+    private MonitorConfig worldMonitorConfig = new MonitorConfig();
     private ProfilerConfig profilerConfig = new ProfilerConfig();
 
     public MonitorConfig getHeapMonitorConfig() {
@@ -62,6 +68,10 @@ public class FlareConfig {
 
     public MonitorConfig getCpuMonitorConfig() {
         return cpuMonitorConfig;
+    }
+
+    public MonitorConfig getWorldMonitorConfig() {
+        return worldMonitorConfig;
     }
 
     public ProfilerConfig getProfilerConfig() {

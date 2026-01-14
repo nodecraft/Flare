@@ -23,6 +23,7 @@ public final class PerformanceProfiler {
     private final ThreadMonitor threadMonitor;
     private final TpsMonitor tpsMonitor;
     private final CpuMonitor cpuMonitor;
+    private final WorldMonitor worldMonitor;
     private final Path profilesDirectory;
     private final String pluginVersion;
 
@@ -43,6 +44,7 @@ public final class PerformanceProfiler {
             ThreadMonitor threadMonitor,
             TpsMonitor tpsMonitor,
             CpuMonitor cpuMonitor,
+            WorldMonitor worldMonitor,
             Path profilesDirectory,
             String pluginVersion
     ) {
@@ -53,6 +55,7 @@ public final class PerformanceProfiler {
         this.threadMonitor = threadMonitor;
         this.tpsMonitor = tpsMonitor;
         this.cpuMonitor = cpuMonitor;
+        this.worldMonitor = worldMonitor;
         this.profilesDirectory = profilesDirectory;
         this.pluginVersion = pluginVersion;
         
@@ -195,12 +198,13 @@ public final class PerformanceProfiler {
                     gcMonitor.collect(),
                     threadMonitor.collect(),
                     tpsMonitor.collect(),
-                    cpuMonitor.collect()
+                    cpuMonitor.collect(),
+                    worldMonitor.collect()
             );
             lastFullSnapshot = snapshot;
             lastFullCollection = now;
         } else {
-            // Collect only fast-changing metrics, reuse cached slow metrics
+            // Collect only fast-changing metrics, reuse cached slow metrics    
             PerformanceSnapshot cached = lastFullSnapshot;
             snapshot = new PerformanceSnapshot(
                     now,
@@ -208,7 +212,8 @@ public final class PerformanceProfiler {
                     cached.gc(),        // Reuse cached GC
                     cached.threads(),   // Reuse cached threads (most expensive)
                     tpsMonitor.collect(), // Collect TPS (changes frequently)
-                    cpuMonitor.collect()  // Collect CPU (changes frequently)
+                    cpuMonitor.collect(), // Collect CPU (changes frequently)
+                    cached.world()     // Reuse cached world snapshot
             );
         }
 

@@ -8,5 +8,6 @@ public record PerformanceSnapshot(
     GcMetrics gc,
     ThreadMetrics threads,
     TpsMetrics tps,
-    CpuMetrics cpu
+    CpuMetrics cpu,
+    WorldMetrics world
 ) {}

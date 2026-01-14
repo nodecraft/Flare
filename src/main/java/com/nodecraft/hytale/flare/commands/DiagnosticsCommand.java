@@ -24,6 +24,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
     private final ThreadMonitor threadMonitor;
     private final TpsMonitor tpsMonitor;
     private final CpuMonitor cpuMonitor;
+    private final WorldMonitor worldMonitor;
     private final PerformanceProfiler profiler;
 
     public DiagnosticsCommand(
@@ -33,6 +34,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
             ThreadMonitor threadMonitor,
             TpsMonitor tpsMonitor,
             CpuMonitor cpuMonitor,
+            WorldMonitor worldMonitor,
             PerformanceProfiler profiler
     ) {
         super("flare", "Performance diagnostics and profiling commands");
@@ -42,6 +44,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         this.threadMonitor = threadMonitor;
         this.tpsMonitor = tpsMonitor;
         this.cpuMonitor = cpuMonitor;
+        this.worldMonitor = worldMonitor;
         this.profiler = profiler;
 
         // Add subcommands
@@ -213,6 +216,16 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
                     cpu.processCpuLoad() * 100,
                     cpu.systemCpuLoad() * 100,
                     cpu.availableProcessors()
+            )));
+        }
+
+        if (snapshot.world() != null) {
+            WorldMetrics world = snapshot.world();
+            context.sendMessage(Message.raw(String.format(
+                    "Worlds: %d, Chunks: %d, Entities: %d",
+                    world.worldCount(),
+                    world.totalLoadedChunks(),
+                    world.totalEntities()
             )));
         }
     }
@@ -404,7 +417,8 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
                 gcMonitor.collect(),
                 threadMonitor.collect(),
                 tpsMonitor.collect(),
-                cpuMonitor.collect()
+                cpuMonitor.collect(),
+                worldMonitor.collect()
         );
     }
 
