@@ -10,6 +10,6 @@
     }
   ],
   "Website": "https://www.nodecraft.com",
-  "Main": "com.nodecraft.hytale.performance_diagnostics.PerformanceDiagnosticsPlugin",
+  "Main": "com.nodecraft.hytale.flare.FlarePlugin",
   "ServerVersion": "*"
 }

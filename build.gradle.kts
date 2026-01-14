@@ -57,6 +57,11 @@ dependencies {
         compileOnly("com.hypixel.hytale:HytaleServer-parent:1.0-SNAPSHOT")
     }
     implementation("com.google.code.gson:gson:2.10.1")
+    
+    // AP-Loader: Bundles async-profiler with native libraries for all platforms
+    // This simplifies deployment by handling platform-specific binaries automatically
+    // See: https://github.com/jvm-profiling-tools/ap-loader
+    implementation("me.bechberger:ap-loader-all:4.2-10")
 }
 
 tasks {

@@ -1,5 +1,6 @@
 package com.nodecraft.hytale.flare.profiler;
 
+import com.nodecraft.hytale.flare.model.CpuProfileData;
 import com.nodecraft.hytale.flare.model.PerformanceSnapshot;
 
 import java.time.Instant;
@@ -13,10 +14,11 @@ public record ProfilerData(
     Instant endTime,
     Duration duration,
     Duration samplingInterval,
-    List<PerformanceSnapshot> snapshots
+    List<PerformanceSnapshot> snapshots,
+    CpuProfileData cpuProfile
 ) {
     public ProfilerData(ProfilerMetadata metadata, Instant startTime, Duration samplingInterval) {
-        this(metadata, startTime, null, null, samplingInterval, new ArrayList<>());
+        this(metadata, startTime, null, null, samplingInterval, new ArrayList<>(), null);
     }
 
     public ProfilerData withEndTime(Instant endTime) {
@@ -24,7 +26,11 @@ public record ProfilerData(
                 ? Duration.between(startTime, endTime)
                 : null;
         // Create a copy of the snapshots list to maintain immutability
-        return new ProfilerData(metadata, startTime, endTime, duration, samplingInterval, new ArrayList<>(snapshots));
+        return new ProfilerData(metadata, startTime, endTime, duration, samplingInterval, new ArrayList<>(snapshots), cpuProfile);
+    }
+    
+    public ProfilerData withCpuProfile(CpuProfileData cpuProfile) {
+        return new ProfilerData(metadata, startTime, endTime, duration, samplingInterval, new ArrayList<>(snapshots), cpuProfile);
     }
 
     public void addSnapshot(PerformanceSnapshot snapshot) {

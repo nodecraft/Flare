@@ -43,19 +43,26 @@ public final class ThreadMonitor {
             threadsByState.put(state, 0);
         }
 
-        // Use getThreadInfo() with maxDepth=0 to avoid stack trace collection (much faster)
-        // This avoids thread suspension and is suitable for passive profiling
+        // For passive profiling, we can skip detailed thread state counting if there are many threads
+        // This is the most expensive operation in thread monitoring
         long[] allThreadIds = threadBean.getAllThreadIds();
         if (allThreadIds != null && allThreadIds.length > 0) {
-            // Batch get thread info without stack traces for better performance
-            java.lang.management.ThreadInfo[] threadInfos = threadBean.getThreadInfo(allThreadIds, 0);
-            if (threadInfos != null) {
-                for (java.lang.management.ThreadInfo threadInfo : threadInfos) {
-                    if (threadInfo != null) {
-                        Thread.State state = threadInfo.getThreadState();
-                        threadsByState.put(state, threadsByState.get(state) + 1);
+            // Only collect thread states if thread count is reasonable (< 200 threads)
+            // For high thread counts, this operation becomes too expensive
+            if (allThreadIds.length < 200) {
+                // Batch get thread info without stack traces for better performance
+                java.lang.management.ThreadInfo[] threadInfos = threadBean.getThreadInfo(allThreadIds, 0);
+                if (threadInfos != null) {
+                    for (java.lang.management.ThreadInfo threadInfo : threadInfos) {
+                        if (threadInfo != null) {
+                            Thread.State state = threadInfo.getThreadState();
+                            threadsByState.put(state, threadsByState.get(state) + 1);
+                        }
                     }
                 }
+            } else {
+                // Too many threads - skip state counting to avoid overhead
+                // Just initialize with zeros (already done above)
             }
         }
 
