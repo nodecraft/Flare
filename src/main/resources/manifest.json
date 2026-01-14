@@ -6,10 +6,10 @@
     {
       "Name": "Matt Artist",
       "Email": "matt.a@nodecraft.com",
-      "Url": "https://www.nodecraft.com"
+      "Url": "https://nodecraft.com"
     }
   ],
-  "Website": "https://www.nodecraft.com",
+  "Website": "https://nodecraft.com",
   "Main": "com.nodecraft.hytale.flare.FlarePlugin",
   "ServerVersion": "*"
 }
