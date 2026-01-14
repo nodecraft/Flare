@@ -4,8 +4,12 @@ import com.nodecraft.hytale.flare.profiler.ProfilerMetadata;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public final class EnvironmentInfoCollector {
@@ -52,10 +56,66 @@ public final class EnvironmentInfoCollector {
                         System.getProperty("os.name"),
                         System.getProperty("os.version"),
                         System.getProperty("os.arch"),
+                        readCpuModel(),
                         runtime.availableProcessors(),
                         runtime.maxMemory(),
                         jvmArgs
                 )
         );
+    }
+
+    private static String readCpuModel() {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (osName.contains("linux")) {
+            try {
+                String[] lines = Files.readString(Path.of("/proc/cpuinfo"), StandardCharsets.UTF_8).split("\n");
+                for (String line : lines) {
+                    String[] parts = line.split("\\s+:\\s", 2);
+                    if (parts.length == 2 && (parts[0].equals("model name") || parts[0].equals("Processor"))) {
+                        return parts[1].trim();
+                    }
+                }
+            } catch (Exception e) {
+                return null;
+            }
+        } else if (osName.contains("windows")) {
+            String wmic = readCommand(new String[]{"wmic", "cpu", "get", "name"});
+            if (wmic != null) {
+                if (wmic.startsWith("Name")) {
+                    return wmic.substring(4).trim();
+                }
+                return wmic;
+            }
+        } else if (osName.contains("mac")) {
+            String sysctl = readCommand(new String[]{"sysctl", "-n", "machdep.cpu.brand_string"});
+            if (sysctl != null) {
+                return sysctl;
+            }
+        }
+        return null;
+    }
+
+    private static String readCommand(String[] command) {
+        try {
+            Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+            if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return null;
+            }
+            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            for (String line : output.split("\n")) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                if (trimmed.equalsIgnoreCase("name")) {
+                    continue;
+                }
+                return trimmed;
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

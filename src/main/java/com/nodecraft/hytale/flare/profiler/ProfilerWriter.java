@@ -1,5 +1,6 @@
 package com.nodecraft.hytale.flare.profiler;
 
+import com.github.luben.zstd.Zstd;
 import com.nodecraft.hytale.flare.util.JsonUtil;
 
 import java.io.IOException;
@@ -27,5 +28,20 @@ public final class ProfilerWriter {
         Files.writeString(filePath, json);
 
         return filePath;
+    }
+
+    public static Path writeCompressedReport(ProfilerData data, Path profilesDirectory) throws IOException {
+        Path jsonPath = writeProfilerData(data, profilesDirectory);
+        try {
+            byte[] input = Files.readAllBytes(jsonPath);
+            byte[] compressed = Zstd.compress(input);
+            String baseName = jsonPath.getFileName().toString().replaceAll("\\.json$", "");
+            Path reportPath = jsonPath.resolveSibling(baseName + ".flarereport");
+            Files.write(reportPath, compressed);
+            Files.deleteIfExists(jsonPath);
+            return reportPath;
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

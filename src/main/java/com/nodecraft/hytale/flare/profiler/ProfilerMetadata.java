@@ -16,6 +16,7 @@ public record ProfilerMetadata(
         String osName,
         String osVersion,
         String osArchitecture,
+        String cpuModel,
         int availableProcessors,
         long maxMemory,
         String jvmArgs

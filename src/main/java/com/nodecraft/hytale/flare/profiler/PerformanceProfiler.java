@@ -153,10 +153,14 @@ public final class PerformanceProfiler {
         }
 
         try {
-            Path filePath = ProfilerWriter.writeProfilerData(data, profilesDirectory);
-            logger.atInfo().log("Stopped profiling session. Wrote %d snapshots to %s", 
-                    data.snapshots().size(), filePath);
-            return true;
+            Path reportPath = ProfilerWriter.writeCompressedReport(data, profilesDirectory);
+            if (reportPath != null) {
+                logger.atInfo().log("Stopped profiling session. Wrote %d snapshots to %s",
+                        data.snapshots().size(), reportPath);
+                return true;
+            }
+            logger.atSevere().log("Failed to write compressed profiler report");
+            return false;
         } catch (Exception e) {
             logger.atSevere().log("Failed to write profiler data: %s", e.getMessage());
             return false;
