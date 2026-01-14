@@ -17,6 +17,10 @@ public final class TpsMonitor {
     private double sumTps = 0.0;
     private int tpsSamples = 0;
     private double lastAvgTickNanos = 0.0;
+    private double lastTickAvg1sNanos = 0.0;
+    private double lastTickAvg10sNanos = 0.0;
+    private double lastTickAvg1mNanos = 0.0;
+    private double lastTickAvg5mNanos = 0.0;
     private long lastTickStepNanos = 0L;
     private HytaleLogger logger;
 
@@ -84,6 +88,10 @@ public final class TpsMonitor {
 
         lastAvgTickNanos = avgTickNanos;
         lastTickStepNanos = tickStepNanos;
+        lastTickAvg10sNanos = getAverageSafe(metrics, 0);
+        lastTickAvg1mNanos = getAverageSafe(metrics, 1);
+        lastTickAvg5mNanos = getAverageSafe(metrics, 2);
+        lastTickAvg1sNanos = computeWindowAverage(metrics, 1_000_000_000L);
         return nanosToTps(Math.max(avgTickNanos, lastTickStepNanos));
     }
 
@@ -98,8 +106,55 @@ public final class TpsMonitor {
         return lastAvgTickNanos;
     }
 
+    public double getLastTickAvg1sNanos() {
+        return lastTickAvg1sNanos;
+    }
+
+    public double getLastTickAvg10sNanos() {
+        return lastTickAvg10sNanos;
+    }
+
+    public double getLastTickAvg1mNanos() {
+        return lastTickAvg1mNanos;
+    }
+
+    public double getLastTickAvg5mNanos() {
+        return lastTickAvg5mNanos;
+    }
+
     public long getLastTickStepNanos() {
         return lastTickStepNanos;
+    }
+
+    private static double getAverageSafe(HistoricMetric metrics, int index) {
+        long[] periods = metrics.getPeriodsNanos();
+        if (periods == null || index < 0 || index >= periods.length) {
+            return 0.0;
+        }
+        return metrics.getAverage(index);
+    }
+
+    private static double computeWindowAverage(HistoricMetric metrics, long windowNanos) {
+        long[] timestamps = metrics.getAllTimestamps();
+        long[] values = metrics.getAllValues();
+        if (timestamps.length == 0 || values.length == 0) {
+            return 0.0;
+        }
+
+        long latest = timestamps[timestamps.length - 1];
+        long cutoff = latest - windowNanos;
+        long sum = 0L;
+        int count = 0;
+
+        for (int i = timestamps.length - 1; i >= 0; i--) {
+            if (timestamps[i] < cutoff) {
+                break;
+            }
+            sum += values[i];
+            count++;
+        }
+
+        return count > 0 ? sum / (double) count : 0.0;
     }
 
     private static double nanosToTps(double tickNanos) {

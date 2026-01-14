@@ -7,6 +7,8 @@ import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.nodecraft.hytale.flare.monitoring.*;
 import com.nodecraft.hytale.flare.model.*;
 import com.nodecraft.hytale.flare.profiler.PerformanceProfiler;
@@ -218,6 +220,10 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
                     "TPS: %.2f (avg: %.2f, min: %.2f, max: %.2f)",
                     tps.currentTps(), tps.averageTps(), tps.minTps(), tps.maxTps()
             )));
+            String tickTimeSummary = formatTickTimeSummary();
+            if (tickTimeSummary != null) {
+                context.sendMessage(Message.raw(tickTimeSummary));
+            }
         }
 
         if (snapshot.threads() != null) {
@@ -337,17 +343,59 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         context.sendMessage(Message.raw(String.format("Min TPS: %.2f", tps.minTps())));
         context.sendMessage(Message.raw(String.format("Max TPS: %.2f", tps.maxTps())));
 
-        double avgTickNanos = tpsMonitor.getLastAvgTickNanos();
-        long tickStepNanos = tpsMonitor.getLastTickStepNanos();
-        if (avgTickNanos > 0.0 && tickStepNanos > 0L) {
-            double avgTickMs = avgTickNanos / 1_000_000.0;
-            double tickBudgetMs = tickStepNanos / 1_000_000.0;
-            context.sendMessage(Message.raw(String.format(
-                    "Avg Tick Time (10s): %.2f ms (target: %.2f ms)",
-                    avgTickMs,
-                    tickBudgetMs
-            )));
+        String tickTimeSummary = formatTickTimeSummary();
+        if (tickTimeSummary != null) {
+            context.sendMessage(Message.raw(tickTimeSummary));
         }
+
+        WorldMetrics worldMetrics = worldMonitor.collect();
+        if (worldMetrics != null && !worldMetrics.worlds().isEmpty()) {
+            context.sendMessage(Message.raw("World Tick (avg 10s):"));
+            var worldMap = Universe.get().getWorlds();
+            for (WorldSnapshot snapshot : worldMetrics.worlds()) {
+                String tickMs = formatTickTimeMs(snapshot.avgTickNanos());
+                String tpsInfo = "";
+                World world = worldMap.get(snapshot.name());
+                if (world != null && snapshot.avgTickNanos() > 0.0) {
+                    double worldTps = 1_000_000_000.0 / Math.max(snapshot.avgTickNanos(), world.getTickStepNanos());
+                    tpsInfo = String.format(", TPS %.2f", worldTps);
+                }
+                context.sendMessage(Message.raw(String.format(
+                        "  %s: %s%s",
+                        snapshot.name(),
+                        tickMs,
+                        tpsInfo
+                )));
+            }
+        }
+    }
+
+    private String formatTickTimeSummary() {
+        long tickStepNanos = tpsMonitor.getLastTickStepNanos();
+        if (tickStepNanos <= 0L) {
+            return null;
+        }
+
+        double avg1s = tpsMonitor.getLastTickAvg1sNanos();
+        double avg10s = tpsMonitor.getLastTickAvg10sNanos();
+        double avg1m = tpsMonitor.getLastTickAvg1mNanos();
+        double avg5m = tpsMonitor.getLastTickAvg5mNanos();
+
+        return String.format(
+                "Avg Tick Time: 1s %s, 10s %s, 1m %s, 5m %s (target: %.2f ms)",
+                formatTickTimeMs(avg1s),
+                formatTickTimeMs(avg10s),
+                formatTickTimeMs(avg1m),
+                formatTickTimeMs(avg5m),
+                tickStepNanos / 1_000_000.0
+        );
+    }
+
+    private String formatTickTimeMs(double nanos) {
+        if (nanos <= 0.0) {
+            return "n/a";
+        }
+        return String.format("%.2f ms", nanos / 1_000_000.0);
     }
 
     private void showCpu(CommandContext context) {
