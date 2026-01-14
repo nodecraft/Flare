@@ -336,6 +336,18 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         context.sendMessage(Message.raw(String.format("Average TPS: %.2f", tps.averageTps())));
         context.sendMessage(Message.raw(String.format("Min TPS: %.2f", tps.minTps())));
         context.sendMessage(Message.raw(String.format("Max TPS: %.2f", tps.maxTps())));
+
+        double avgTickNanos = tpsMonitor.getLastAvgTickNanos();
+        long tickStepNanos = tpsMonitor.getLastTickStepNanos();
+        if (avgTickNanos > 0.0 && tickStepNanos > 0L) {
+            double avgTickMs = avgTickNanos / 1_000_000.0;
+            double tickBudgetMs = tickStepNanos / 1_000_000.0;
+            context.sendMessage(Message.raw(String.format(
+                    "Avg Tick Time (10s): %.2f ms (target: %.2f ms)",
+                    avgTickMs,
+                    tickBudgetMs
+            )));
+        }
     }
 
     private void showCpu(CommandContext context) {
