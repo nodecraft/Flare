@@ -92,14 +92,33 @@ public final class PerformanceProfiler {
 
         // Start async-profiler if available and enabled
         if (asyncProfiler != null && asyncProfiler.isInitialized() && config.isCpuProfilingEnabled()) {
+            if (config.isDebugEnvLogging()) {
+                ContainerDiagnostics.logAsyncProfilerEnvironment(logger);
+            }
             int intervalMs = config.getCpuSamplingIntervalMs();
-            if (!asyncProfiler.start(intervalMs)) {
+            String requestedEvent = config.getCpuProfilingEvent().name().toLowerCase();
+            String eventToUse = requestedEvent;
+            if ("cpu".equals(eventToUse) && ContainerDiagnostics.isCpuProfilingRestricted()) {
+                logger.atWarning().log("Detected restricted perf environment; switching async-profiler event from 'cpu' to 'wall'");
+                eventToUse = "wall";
+            }
+            if (!asyncProfiler.isEventSupported(eventToUse)) {
+                String fallback = "wall";
+                if (!fallback.equals(eventToUse) && asyncProfiler.isEventSupported(fallback)) {
+                    logger.atWarning().log("Async-profiler event '%s' not supported, falling back to '%s'", eventToUse, fallback);
+                    eventToUse = fallback;
+                } else {
+                    logger.atWarning().log("Async-profiler event '%s' not supported", eventToUse);
+                }
+            }
+            if (!asyncProfiler.start(intervalMs, eventToUse)) {
                 logger.atWarning().log("Failed to start async-profiler, continuing with system metrics only");
             }
         }
 
         ProfilerMetadata metadata = EnvironmentInfoCollector.createMetadata(pluginVersion);
-        ProfilerSession session = new ProfilerSession(metadata, config, this::collectSnapshot, profilerExecutor);
+        ProfilerPreamble preamble = ProfilerPreambleCollector.collect();
+        ProfilerSession session = new ProfilerSession(metadata, preamble, config, this::collectSnapshotSafe, profilerExecutor);
         if (activeSession.compareAndSet(null, session)) {
             session.startSampling(HytaleServer.SCHEDULED_EXECUTOR);
             logger.atInfo().log("Started performance profiling session");
@@ -115,7 +134,8 @@ public final class PerformanceProfiler {
         }
 
         session.stop();
-        
+        session.setPostamble(ProfilerPreambleCollector.collect());
+
         // Stop async-profiler and collect CPU profile data
         CpuProfileData cpuProfile = null;
         if (asyncProfiler != null && asyncProfiler.isProfiling()) {
@@ -183,7 +203,12 @@ public final class PerformanceProfiler {
         }
 
         Instant now = Instant.now();
-        long timeSinceFullCollection = java.time.Duration.between(lastFullCollection, now).toMillis();
+        long timeSinceFullCollection;
+        if (lastFullSnapshot == null || Instant.MIN.equals(lastFullCollection)) {
+            timeSinceFullCollection = Long.MAX_VALUE;
+        } else {
+            timeSinceFullCollection = java.time.Duration.between(lastFullCollection, now).toMillis();
+        }
         
         // Tiered collection: collect expensive metrics less frequently
         // Fast metrics (TPS, CPU) are collected every snapshot
@@ -223,6 +248,14 @@ public final class PerformanceProfiler {
             // Auto-stop if limits reached
             // Note: stop() may write files, which is acceptable on background thread
             stop();
+        }
+    }
+
+    private void collectSnapshotSafe() {
+        try {
+            collectSnapshot();
+        } catch (Exception e) {
+            logger.atWarning().log("Snapshot collection failed: %s", e.getMessage());
         }
     }
 }

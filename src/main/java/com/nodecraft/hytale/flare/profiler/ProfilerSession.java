@@ -14,13 +14,20 @@ public final class ProfilerSession {
     private final ProfilerData data;
     private final ProfilerConfig config;
     private final AtomicBoolean active;
+    private ProfilerPreamble postamble;
     private ScheduledFuture<?> samplingTask;
     private final Runnable samplingCallback;
     private final ScheduledExecutorService profilerExecutor;
 
-    public ProfilerSession(ProfilerMetadata metadata, ProfilerConfig config, Runnable samplingCallback, ScheduledExecutorService profilerExecutor) {
+    public ProfilerSession(
+            ProfilerMetadata metadata,
+            ProfilerPreamble preamble,
+            ProfilerConfig config,
+            Runnable samplingCallback,
+            ScheduledExecutorService profilerExecutor
+    ) {
         this.config = config;
-        this.data = new ProfilerData(metadata, Instant.now(), config.getSamplingInterval());
+        this.data = new ProfilerData(metadata, preamble, Instant.now(), config.getSamplingInterval());
         this.active = new AtomicBoolean(true);
         this.samplingCallback = samplingCallback;
         this.profilerExecutor = profilerExecutor;
@@ -31,12 +38,11 @@ public final class ProfilerSession {
             return;
         }
 
-        long intervalSeconds = config.getSamplingInterval().getSeconds();
-        samplingTask = executor.scheduleAtFixedRate(
+        long intervalSeconds = config.getSamplingInterval().getSeconds();       
+        samplingTask = profilerExecutor.scheduleAtFixedRate(
                 () -> {
                     if (isActive()) {
-                        // Submit to background executor asynchronously, don't execute synchronously
-                        profilerExecutor.submit(samplingCallback);
+                        samplingCallback.run();
                     }
                 },
                 intervalSeconds,
@@ -61,8 +67,12 @@ public final class ProfilerSession {
         if (data.startTime() == null) {
             return false;
         }
-        Duration elapsed = Duration.between(data.startTime(), Instant.now());
-        return elapsed.compareTo(config.getMaxDuration()) >= 0;
+        Duration maxDuration = config.getMaxDuration();
+        if (maxDuration == null || maxDuration.isZero() || maxDuration.isNegative()) {
+            return false;
+        }
+        Duration elapsed = Duration.between(data.startTime(), Instant.now());   
+        return elapsed.compareTo(maxDuration) >= 0;
     }
 
     public boolean isMaxSnapshotsReached() {
@@ -75,9 +85,14 @@ public final class ProfilerSession {
         }
     }
 
+    public void setPostamble(ProfilerPreamble postamble) {
+        this.postamble = postamble;
+    }
+
     public ProfilerData getData() {
         Instant endTime = isActive() ? null : Instant.now();
-        return data.withEndTime(endTime);
+        ProfilerData snapshot = data.withEndTime(endTime);
+        return postamble != null ? snapshot.withPostamble(postamble) : snapshot;
     }
 
     public Instant getStartTime() {

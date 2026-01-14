@@ -123,7 +123,7 @@ public final class AsyncProfilerWrapper {
      * @param intervalMs Sampling interval in milliseconds (1-100ms recommended)
      * @return true if profiling started successfully, false otherwise
      */
-    public boolean start(int intervalMs) {
+    public boolean start(int intervalMs, String event) {
         if (!available || asyncProfilerInstance == null) {
             return false;
         }
@@ -134,12 +134,13 @@ public final class AsyncProfilerWrapper {
         }
 
         try {
-            // async-profiler start("cpu", intervalMs)
-            startMethod.invoke(asyncProfilerInstance, "cpu", (long) intervalMs);
+            String selectedEvent = event == null ? "cpu" : event;
+            // async-profiler start("event", intervalMs)
+            startMethod.invoke(asyncProfilerInstance, selectedEvent, (long) intervalMs);
             isProfiling.set(true);
             startTime.set(Instant.now());
             samplingInterval.set(intervalMs);
-            logger.atInfo().log("Started async-profiler with %dms sampling interval", intervalMs);
+            logger.atInfo().log("Started async-profiler with %dms sampling interval (event=%s)", intervalMs, selectedEvent);
             return true;
         } catch (Exception e) {
             logger.atSevere().log("Failed to start async-profiler: %s", e.getMessage());
@@ -162,20 +163,29 @@ public final class AsyncProfilerWrapper {
             Instant start = startTime.get();
             int interval = samplingInterval.get() != null ? samplingInterval.get() : 20;
             
-            // Get output in collapsed format BEFORE stopping
+            // Prefer stop+dump in one call to avoid empty/partial output
             String output = null;
+            boolean stopped = false;
             try {
-                // Get output while still profiling
-                output = (String) executeMethod.invoke(asyncProfilerInstance, "collapsed");
+                output = (String) executeMethod.invoke(asyncProfilerInstance, "stop,collapsed");
+                stopped = true;
             } catch (Exception e) {
-                logger.atWarning().log("Failed to get collapsed output: %s", e.getMessage());
+                logger.atWarning().log("Failed to stop+dump collapsed output: %s", e.getMessage());
             }
-            
-            // Now stop the profiler
-            try {
-                stopMethod.invoke(asyncProfilerInstance);
-            } catch (Exception e) {
-                logger.atWarning().log("Failed to stop profiler: %s", e.getMessage());
+
+            // Fallback to separate dump + stop if combined call failed
+            if (!stopped) {
+                try {
+                    output = (String) executeMethod.invoke(asyncProfilerInstance, "collapsed");
+                } catch (Exception e) {
+                    logger.atWarning().log("Failed to get collapsed output: %s", e.getMessage());
+                }
+
+                try {
+                    stopMethod.invoke(asyncProfilerInstance);
+                } catch (Exception e) {
+                    logger.atWarning().log("Failed to stop profiler: %s", e.getMessage());
+                }
             }
             
             // Parse output into stack samples
@@ -419,6 +429,22 @@ public final class AsyncProfilerWrapper {
      */
     public boolean isInitialized() {
         return available && asyncProfilerInstance != null;
+    }
+
+    public boolean isEventSupported(String event) {
+        if (!available || asyncProfilerInstance == null || executeMethod == null) {
+            return false;
+        }
+        String value = event == null ? "" : event.trim();
+        if (value.isEmpty()) {
+            return false;
+        }
+        try {
+            String response = (String) executeMethod.invoke(asyncProfilerInstance, "check,event=" + value);
+            return response != null && response.trim().equalsIgnoreCase("ok");
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**
