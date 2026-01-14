@@ -1,5 +1,6 @@
 package com.nodecraft.hytale.flare.monitoring;
 
+import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.commands.world.perf.WorldPerfCommand;
@@ -16,9 +17,11 @@ public final class TpsMonitor {
     private double maxTps = 20.0;
     private double sumTps = 0.0;
     private int tpsSamples = 0;
+    private HytaleLogger logger;
 
-    public TpsMonitor(MonitorConfig config) {
+    public TpsMonitor(MonitorConfig config, HytaleLogger logger) {
         this.config = config;
+        this.logger = logger;
     }
 
     public boolean isEnabled() {
@@ -32,6 +35,7 @@ public final class TpsMonitor {
 
         Map<String, World> worlds = Universe.get().getWorlds();
         if (worlds.isEmpty()) {
+            logger.atWarning().log("No worlds found. TPS will be set to 20.0");
             return new TpsMetrics(20.0, 20.0, 20.0, 20.0);
         }
 
@@ -42,6 +46,7 @@ public final class TpsMonitor {
         }
 
         if (defaultWorld == null) {
+            logger.atWarning().log("No default world found. TPS will be set to 20.0");
             return new TpsMetrics(20.0, 20.0, 20.0, 20.0);
         }
 

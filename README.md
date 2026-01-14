@@ -47,7 +47,7 @@ The plugin provides a `/flare` command with the following subcommands:
 - `/flare tps` - Show TPS information
 - `/flare cpu` - Show CPU usage (if available)
 - `/flare network` - Show network traffic statistics
-- `/flare profile start [duration]` - Start a profiling session
+- `/flare profile start [timeoutSeconds]` - Start a profiling session (auto-stop after N seconds)
 - `/flare profile stop` - Stop the current profiling session
 - `/flare profile status` - Show profiling session status
 
@@ -56,6 +56,11 @@ The plugin provides a `/flare` command with the following subcommands:
 To start profiling:
 ```
 /flare profile start
+```
+
+To auto-stop after 30 seconds:
+```
+/flare profile start 30
 ```
 
 This will begin collecting performance snapshots at the configured interval (default: 1 second). The profiler will automatically stop when:

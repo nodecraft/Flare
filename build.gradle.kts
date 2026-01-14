@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "com.nodecraft.hytale"
-version = "1.0.0"
+version = "1.0.1"
 
 // Hytale home directory (cross-platform)
 val hytaleHome = when {

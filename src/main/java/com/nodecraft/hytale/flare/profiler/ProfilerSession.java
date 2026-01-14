@@ -14,6 +14,7 @@ public final class ProfilerSession {
     private final ProfilerData data;
     private final ProfilerConfig config;
     private final AtomicBoolean active;
+    private final Duration maxDurationOverride;
     private ProfilerPreamble postamble;
     private ScheduledFuture<?> samplingTask;
     private final Runnable samplingCallback;
@@ -23,12 +24,14 @@ public final class ProfilerSession {
             ProfilerMetadata metadata,
             ProfilerPreamble preamble,
             ProfilerConfig config,
+            Duration maxDurationOverride,
             Runnable samplingCallback,
             ScheduledExecutorService profilerExecutor
     ) {
         this.config = config;
         this.data = new ProfilerData(metadata, preamble, Instant.now(), config.getSamplingInterval());
         this.active = new AtomicBoolean(true);
+        this.maxDurationOverride = maxDurationOverride;
         this.samplingCallback = samplingCallback;
         this.profilerExecutor = profilerExecutor;
     }
@@ -67,7 +70,7 @@ public final class ProfilerSession {
         if (data.startTime() == null) {
             return false;
         }
-        Duration maxDuration = config.getMaxDuration();
+        Duration maxDuration = maxDurationOverride != null ? maxDurationOverride : config.getMaxDuration();
         if (maxDuration == null || maxDuration.isZero() || maxDuration.isNegative()) {
             return false;
         }

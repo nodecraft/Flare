@@ -45,7 +45,7 @@ public class FlarePlugin extends JavaPlugin {
         this.heapMonitor = new HeapMonitor(config.getHeapMonitorConfig());
         this.gcMonitor = new GcMonitor(config.getGcMonitorConfig());
         this.threadMonitor = new ThreadMonitor(config.getThreadMonitorConfig());
-        this.tpsMonitor = new TpsMonitor(config.getTpsMonitorConfig());
+        this.tpsMonitor = new TpsMonitor(config.getTpsMonitorConfig(), getLogger());
         this.cpuMonitor = new CpuMonitor(config.getCpuMonitorConfig());
         this.networkMonitor = new NetworkMonitor(config.getNetworkMonitorConfig());
         this.worldMonitor = new WorldMonitor(config.getWorldMonitorConfig());

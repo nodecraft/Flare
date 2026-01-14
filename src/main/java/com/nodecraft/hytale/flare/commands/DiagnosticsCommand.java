@@ -2,6 +2,8 @@ package com.nodecraft.hytale.flare.commands;
 
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
+import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
@@ -159,13 +161,17 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         }
 
         private class ProfileStartCommand extends CommandBase {
+            private final OptionalArg<Integer> timeoutSecondsArg =
+                    this.withOptionalArg("timeout", "flare.commands.profile.start.timeout", ArgTypes.INTEGER);
+
             public ProfileStartCommand() {
                 super("start", "Start a profiling session");
+                this.setAllowsExtraArguments(true);
             }
 
             @Override
             protected void executeSync(@Nonnull CommandContext context) {
-                startProfile(context);
+                startProfile(context, timeoutSecondsArg);
             }
         }
 
@@ -382,17 +388,62 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         }
     }
 
-    private void startProfile(CommandContext context) {
+    private void startProfile(CommandContext context, OptionalArg<Integer> timeoutSecondsArg) {
         ProfilerSession activeSession = profiler.getActiveSession();
         if (activeSession != null) {
             context.sendMessage(Message.raw("A profiling session is already active"));
             return;
         }
 
-        if (profiler.start()) {
-            context.sendMessage(Message.raw("Started performance profiling session"));
+        Duration timeout = null;
+        if (timeoutSecondsArg != null && timeoutSecondsArg.provided(context)) {
+            Integer seconds = timeoutSecondsArg.get(context);
+            if (seconds == null || seconds <= 0) {
+                context.sendMessage(Message.raw("Timeout must be a positive number of seconds"));
+                return;
+            }
+            timeout = Duration.ofSeconds(seconds);
+        } else {
+            Integer seconds = parseTrailingSeconds(context.getInputString());
+            if (seconds != null) {
+                if (seconds <= 0) {
+                    context.sendMessage(Message.raw("Timeout must be a positive number of seconds"));
+                    return;
+                }
+                timeout = Duration.ofSeconds(seconds);
+            }
+        }
+
+        if (profiler.start(timeout)) {
+            if (timeout != null) {
+                context.sendMessage(Message.raw(String.format(
+                        "Started performance profiling session (auto-stop in %d seconds)",
+                        timeout.getSeconds()
+                )));
+            } else {
+                context.sendMessage(Message.raw("Started performance profiling session"));
+            }
         } else {
             context.sendMessage(Message.raw("Failed to start profiling session"));
+        }
+    }
+
+    private Integer parseTrailingSeconds(String input) {
+        if (input == null || input.isBlank()) {
+            return null;
+        }
+        String[] parts = input.trim().split("\\s+");
+        if (parts.length == 0) {
+            return null;
+        }
+        String last = parts[parts.length - 1];
+        if (last.startsWith("--")) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(last);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

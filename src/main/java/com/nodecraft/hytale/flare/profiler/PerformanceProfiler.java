@@ -31,6 +31,7 @@ public final class PerformanceProfiler {
     private final AtomicReference<ProfilerSession> activeSession = new AtomicReference<>();
     private final ScheduledExecutorService profilerExecutor;
     private final AsyncProfilerWrapper asyncProfiler;
+    private java.util.concurrent.ScheduledFuture<?> autoStopTask;
     
     // Cached metrics for tiered collection
     private volatile PerformanceSnapshot lastFullSnapshot = null;
@@ -89,6 +90,10 @@ public final class PerformanceProfiler {
     }
 
     public boolean start() {
+        return start(null);
+    }
+
+    public boolean start(java.time.Duration maxDurationOverride) {
         if (activeSession.get() != null) {
             return false;
         }
@@ -121,12 +126,20 @@ public final class PerformanceProfiler {
 
         ProfilerMetadata metadata = EnvironmentInfoCollector.createMetadata(pluginVersion);
         ProfilerPreamble preamble = ProfilerPreambleCollector.collect();
-        ProfilerSession session = new ProfilerSession(metadata, preamble, config, this::collectSnapshotSafe, profilerExecutor);
+        ProfilerSession session = new ProfilerSession(
+                metadata,
+                preamble,
+                config,
+                maxDurationOverride,
+                this::collectSnapshotSafe,
+                profilerExecutor
+        );
         if (activeSession.compareAndSet(null, session)) {
             if (networkMonitor != null && networkMonitor.isEnabled()) {
                 networkMonitor.beginProfile();
             }
             session.startSampling(HytaleServer.SCHEDULED_EXECUTOR);
+            scheduleAutoStop(session, maxDurationOverride);
             logger.atInfo().log("Started performance profiling session");
             return true;
         }
@@ -139,6 +152,7 @@ public final class PerformanceProfiler {
             return false;
         }
 
+        cancelAutoStop();
         session.stop();
         if (networkMonitor != null && networkMonitor.isEnabled()) {
             networkMonitor.endProfile();
@@ -173,6 +187,27 @@ public final class PerformanceProfiler {
         } catch (Exception e) {
             logger.atSevere().log("Failed to write profiler data: %s", e.getMessage());
             return false;
+        }
+    }
+
+    private void scheduleAutoStop(ProfilerSession session, java.time.Duration maxDurationOverride) {
+        cancelAutoStop();
+        if (maxDurationOverride == null || maxDurationOverride.isZero() || maxDurationOverride.isNegative()) {
+            return;
+        }
+        long delayMs = maxDurationOverride.toMillis();
+        autoStopTask = profilerExecutor.schedule(() -> {
+            ProfilerSession current = activeSession.get();
+            if (current == session) {
+                stop();
+            }
+        }, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    private void cancelAutoStop() {
+        if (autoStopTask != null) {
+            autoStopTask.cancel(false);
+            autoStopTask = null;
         }
     }
 
