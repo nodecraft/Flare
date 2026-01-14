@@ -24,6 +24,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
     private final ThreadMonitor threadMonitor;
     private final TpsMonitor tpsMonitor;
     private final CpuMonitor cpuMonitor;
+    private final NetworkMonitor networkMonitor;
     private final WorldMonitor worldMonitor;
     private final PerformanceProfiler profiler;
 
@@ -34,6 +35,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
             ThreadMonitor threadMonitor,
             TpsMonitor tpsMonitor,
             CpuMonitor cpuMonitor,
+            NetworkMonitor networkMonitor,
             WorldMonitor worldMonitor,
             PerformanceProfiler profiler
     ) {
@@ -44,6 +46,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         this.threadMonitor = threadMonitor;
         this.tpsMonitor = tpsMonitor;
         this.cpuMonitor = cpuMonitor;
+        this.networkMonitor = networkMonitor;
         this.worldMonitor = worldMonitor;
         this.profiler = profiler;
 
@@ -55,6 +58,7 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         this.addSubCommand(new ThreadsCommand());
         this.addSubCommand(new TpsCommand());
         this.addSubCommand(new CpuCommand());
+        this.addSubCommand(new NetworkCommand());
         this.addSubCommand(new ProfileCommand());
     }
 
@@ -132,6 +136,17 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         @Override
         protected void executeSync(@Nonnull CommandContext context) {
             showCpu(context);
+        }
+    }
+
+    private class NetworkCommand extends CommandBase {
+        public NetworkCommand() {
+            super("network", "Show network statistics");
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext context) {
+            showNetwork(context);
         }
     }
 
@@ -226,6 +241,15 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
                     world.worldCount(),
                     world.totalLoadedChunks(),
                     world.totalEntities()
+            )));
+        }
+
+        if (snapshot.network() != null) {
+            NetworkMetrics network = snapshot.network();
+            context.sendMessage(Message.raw(String.format(
+                    "Network: Sent %s / Received %s",
+                    formatBytes(network.totalSentCompressedBytes()),
+                    formatBytes(network.totalReceivedCompressedBytes())
             )));
         }
     }
@@ -326,6 +350,38 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
         context.sendMessage(Message.raw(String.format("System CPU Load: %.2f%%", cpu.systemCpuLoad() * 100)));
     }
 
+    private void showNetwork(CommandContext context) {
+        NetworkMetrics network = networkMonitor.collect();
+        if (network == null) {
+            context.sendMessage(Message.raw("Network monitoring is disabled"));
+            return;
+        }
+
+        context.sendMessage(Message.raw("=== Network Stats ==="));
+        context.sendMessage(Message.raw(String.format(
+                "Total Sent: %s (raw: %s)",
+                formatBytes(network.totalSentCompressedBytes()),
+                formatBytes(network.totalSentUncompressedBytes())
+        )));
+        context.sendMessage(Message.raw(String.format(
+                "Total Received: %s (raw: %s)",
+                formatBytes(network.totalReceivedCompressedBytes()),
+                formatBytes(network.totalReceivedUncompressedBytes())
+        )));
+        context.sendMessage(Message.raw(String.format(
+                "Since Start - Sent: %s, Received: %s",
+                formatBytes(network.sinceStartSentCompressedBytes()),
+                formatBytes(network.sinceStartReceivedCompressedBytes())
+        )));
+        if (network.profileActive()) {
+            context.sendMessage(Message.raw(String.format(
+                    "During Profile - Sent: %s, Received: %s",
+                    formatBytes(network.sinceProfileSentCompressedBytes()),
+                    formatBytes(network.sinceProfileReceivedCompressedBytes())
+            )));
+        }
+    }
+
     private void startProfile(CommandContext context) {
         ProfilerSession activeSession = profiler.getActiveSession();
         if (activeSession != null) {
@@ -418,7 +474,8 @@ public final class DiagnosticsCommand extends AbstractCommandCollection {
                 threadMonitor.collect(),
                 tpsMonitor.collect(),
                 cpuMonitor.collect(),
-                worldMonitor.collect()
+                worldMonitor.collect(),
+                networkMonitor.collect()
         );
     }
 

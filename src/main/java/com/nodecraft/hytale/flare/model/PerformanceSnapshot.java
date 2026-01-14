@@ -9,5 +9,6 @@ public record PerformanceSnapshot(
     ThreadMetrics threads,
     TpsMetrics tps,
     CpuMetrics cpu,
-    WorldMetrics world
+    WorldMetrics world,
+    NetworkMetrics network
 ) {}

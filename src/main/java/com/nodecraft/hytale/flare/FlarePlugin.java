@@ -12,6 +12,7 @@ import com.nodecraft.hytale.flare.config.FlareConfig;
 import com.nodecraft.hytale.flare.monitoring.CpuMonitor;
 import com.nodecraft.hytale.flare.monitoring.GcMonitor;
 import com.nodecraft.hytale.flare.monitoring.HeapMonitor;
+import com.nodecraft.hytale.flare.monitoring.NetworkMonitor;
 import com.nodecraft.hytale.flare.monitoring.ThreadMonitor;
 import com.nodecraft.hytale.flare.monitoring.TpsMonitor;
 import com.nodecraft.hytale.flare.monitoring.WorldMonitor;
@@ -27,6 +28,7 @@ public class FlarePlugin extends JavaPlugin {
     private ThreadMonitor threadMonitor;
     private TpsMonitor tpsMonitor;
     private CpuMonitor cpuMonitor;
+    private NetworkMonitor networkMonitor;
     private WorldMonitor worldMonitor;
     private PerformanceProfiler profiler;
     private DiagnosticsCommand diagnosticsCommand;
@@ -45,6 +47,7 @@ public class FlarePlugin extends JavaPlugin {
         this.threadMonitor = new ThreadMonitor(config.getThreadMonitorConfig());
         this.tpsMonitor = new TpsMonitor(config.getTpsMonitorConfig());
         this.cpuMonitor = new CpuMonitor(config.getCpuMonitorConfig());
+        this.networkMonitor = new NetworkMonitor(config.getNetworkMonitorConfig());
         this.worldMonitor = new WorldMonitor(config.getWorldMonitorConfig());
 
         // Initialize profiler
@@ -61,6 +64,7 @@ public class FlarePlugin extends JavaPlugin {
                 threadMonitor,
                 tpsMonitor,
                 cpuMonitor,
+                networkMonitor,
                 worldMonitor,
                 profilesDirectory,
                 pluginVersion
@@ -74,6 +78,7 @@ public class FlarePlugin extends JavaPlugin {
                 threadMonitor,
                 tpsMonitor,
                 cpuMonitor,
+                networkMonitor,
                 worldMonitor,
                 profiler
         );

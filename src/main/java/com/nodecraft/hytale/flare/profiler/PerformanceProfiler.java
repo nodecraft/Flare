@@ -23,6 +23,7 @@ public final class PerformanceProfiler {
     private final ThreadMonitor threadMonitor;
     private final TpsMonitor tpsMonitor;
     private final CpuMonitor cpuMonitor;
+    private final NetworkMonitor networkMonitor;
     private final WorldMonitor worldMonitor;
     private final Path profilesDirectory;
     private final String pluginVersion;
@@ -44,6 +45,7 @@ public final class PerformanceProfiler {
             ThreadMonitor threadMonitor,
             TpsMonitor tpsMonitor,
             CpuMonitor cpuMonitor,
+            NetworkMonitor networkMonitor,
             WorldMonitor worldMonitor,
             Path profilesDirectory,
             String pluginVersion
@@ -55,6 +57,7 @@ public final class PerformanceProfiler {
         this.threadMonitor = threadMonitor;
         this.tpsMonitor = tpsMonitor;
         this.cpuMonitor = cpuMonitor;
+        this.networkMonitor = networkMonitor;
         this.worldMonitor = worldMonitor;
         this.profilesDirectory = profilesDirectory;
         this.pluginVersion = pluginVersion;
@@ -120,6 +123,9 @@ public final class PerformanceProfiler {
         ProfilerPreamble preamble = ProfilerPreambleCollector.collect();
         ProfilerSession session = new ProfilerSession(metadata, preamble, config, this::collectSnapshotSafe, profilerExecutor);
         if (activeSession.compareAndSet(null, session)) {
+            if (networkMonitor != null && networkMonitor.isEnabled()) {
+                networkMonitor.beginProfile();
+            }
             session.startSampling(HytaleServer.SCHEDULED_EXECUTOR);
             logger.atInfo().log("Started performance profiling session");
             return true;
@@ -134,6 +140,9 @@ public final class PerformanceProfiler {
         }
 
         session.stop();
+        if (networkMonitor != null && networkMonitor.isEnabled()) {
+            networkMonitor.endProfile();
+        }
         session.setPostamble(ProfilerPreambleCollector.collect());
 
         // Stop async-profiler and collect CPU profile data
@@ -228,7 +237,8 @@ public final class PerformanceProfiler {
                     threadMonitor.collect(),
                     tpsMonitor.collect(),
                     cpuMonitor.collect(),
-                    worldMonitor.collect()
+                    worldMonitor.collect(),
+                    networkMonitor.collect()
             );
             lastFullSnapshot = snapshot;
             lastFullCollection = now;
@@ -242,7 +252,8 @@ public final class PerformanceProfiler {
                     cached.threads(),   // Reuse cached threads (most expensive)
                     tpsMonitor.collect(), // Collect TPS (changes frequently)
                     cpuMonitor.collect(), // Collect CPU (changes frequently)
-                    cached.world()     // Reuse cached world snapshot
+                    cached.world(),     // Reuse cached world snapshot
+                    networkMonitor.collect()
             );
         }
 

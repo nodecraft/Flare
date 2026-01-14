@@ -6,6 +6,7 @@ plugins {
     id("com.gradleup.shadow") version "9.2.2"
     idea
     id("org.jetbrains.gradle.plugin.idea-ext") version "1.3"
+    id("com.google.protobuf") version "0.9.4"
 }
 
 group = "com.nodecraft.hytale"
@@ -37,6 +38,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
 }
 
+sourceSets {
+    main {
+        java {
+            srcDir("build/generated/source/proto/main/java")
+        }
+    }
+}
+
 repositories {
     mavenLocal()
     mavenCentral()
@@ -57,11 +66,18 @@ dependencies {
         compileOnly("com.hypixel.hytale:HytaleServer-parent:1.0-SNAPSHOT")
     }
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.protobuf:protobuf-java:3.25.3")
     
     // AP-Loader: Bundles async-profiler with native libraries for all platforms
     // This simplifies deployment by handling platform-specific binaries automatically
     // See: https://github.com/jvm-profiling-tools/ap-loader
     implementation("me.bechberger:ap-loader-all:4.2-10")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:3.25.3"
+    }
 }
 
 tasks {

@@ -1,0 +1,198 @@
+syntax = "proto3";
+
+package flare.report;
+
+option java_package = "com.nodecraft.hytale.flare.report";
+option java_outer_classname = "FlareReportProtos";
+option java_multiple_files = true;
+
+message ProfilerData {
+  ProfilerMetadata metadata = 1;
+  ProfilerPreamble preamble = 2;
+  ProfilerPreamble postamble = 3;
+  int64 startTimeMillis = 4;
+  int64 endTimeMillis = 5;
+  int64 durationMillis = 6;
+  int64 samplingIntervalMillis = 7;
+  repeated PerformanceSnapshot snapshots = 8;
+  CpuProfileData cpuProfile = 9;
+}
+
+message ProfilerMetadata {
+  int32 profileVersion = 1;
+  string pluginVersion = 2;
+  int64 profileCreatedAtMillis = 3;
+  EnvironmentInfo environment = 4;
+}
+
+message EnvironmentInfo {
+  string javaVersion = 1;
+  string javaVendor = 2;
+  string javaVmName = 3;
+  string javaVmVersion = 4;
+  string osName = 5;
+  string osVersion = 6;
+  string osArchitecture = 7;
+  string cpuModel = 8;
+  int32 availableProcessors = 9;
+  int64 maxMemory = 10;
+  string jvmArgs = 11;
+}
+
+message ProfilerPreamble {
+  int64 capturedAtMillis = 1;
+  ConfigFileDump serverConfig = 2;
+  repeated WorldConfigDump worldConfigs = 3;
+}
+
+message ConfigFileDump {
+  string path = 1;
+  string contents = 2;
+  string error = 3;
+}
+
+message WorldConfigDump {
+  string worldName = 1;
+  string path = 2;
+  string contents = 3;
+  string error = 4;
+}
+
+message PerformanceSnapshot {
+  int64 timestampMillis = 1;
+  HeapMetrics heap = 2;
+  GcMetrics gc = 3;
+  ThreadMetrics threads = 4;
+  TpsMetrics tps = 5;
+  CpuMetrics cpu = 6;
+  WorldMetrics world = 7;
+  NetworkMetrics network = 8;
+}
+
+message HeapMetrics {
+  int64 used = 1;
+  int64 max = 2;
+  int64 committed = 3;
+  int64 free = 4;
+  double usageRatio = 5;
+}
+
+message GcMetrics {
+  repeated GcCollectorInfo collectors = 1;
+  int64 totalCollections = 2;
+  int64 totalCollectionTime = 3;
+  double averagePauseTime = 4;
+  int64 lastCollectionTime = 5;
+  int64 lastCollectionDuration = 6;
+}
+
+message GcCollectorInfo {
+  string name = 1;
+  int64 collectionCount = 2;
+  int64 collectionTime = 3;
+  double averagePauseTime = 4;
+}
+
+message ThreadMetrics {
+  int32 totalThreads = 1;
+  int32 peakThreads = 2;
+  int64 totalStartedThreads = 3;
+  int32 daemonThreads = 4;
+  repeated ThreadStateCount threadsByState = 5;
+  repeated int64 deadlockedThreads = 6;
+}
+
+message ThreadStateCount {
+  ThreadState state = 1;
+  int32 count = 2;
+}
+
+enum ThreadState {
+  THREAD_STATE_UNSPECIFIED = 0;
+  THREAD_STATE_NEW = 1;
+  THREAD_STATE_RUNNABLE = 2;
+  THREAD_STATE_BLOCKED = 3;
+  THREAD_STATE_WAITING = 4;
+  THREAD_STATE_TIMED_WAITING = 5;
+  THREAD_STATE_TERMINATED = 6;
+}
+
+message TpsMetrics {
+  double currentTps = 1;
+  double averageTps = 2;
+  double minTps = 3;
+  double maxTps = 4;
+}
+
+message CpuMetrics {
+  double processCpuLoad = 1;
+  double systemCpuLoad = 2;
+  int32 availableProcessors = 3;
+  bool cpuMonitoringAvailable = 4;
+}
+
+message WorldMetrics {
+  int32 worldCount = 1;
+  int32 totalLoadedChunks = 2;
+  int32 totalEntities = 3;
+  repeated WorldSnapshot worlds = 4;
+}
+
+message WorldSnapshot {
+  string name = 1;
+  bool ticking = 2;
+  bool paused = 3;
+  int32 loadedChunks = 4;
+  int32 totalGeneratedChunks = 5;
+  int32 totalLoadedChunks = 6;
+  int32 entityCount = 7;
+  int32 archetypeChunkCount = 8;
+  double avgTickNanos = 9;
+}
+
+message NetworkMetrics {
+  int64 totalSentPackets = 1;
+  int64 totalReceivedPackets = 2;
+  int64 totalSentUncompressedBytes = 3;
+  int64 totalReceivedUncompressedBytes = 4;
+  int64 totalSentCompressedBytes = 5;
+  int64 totalReceivedCompressedBytes = 6;
+  int64 sinceStartSentPackets = 7;
+  int64 sinceStartReceivedPackets = 8;
+  int64 sinceStartSentUncompressedBytes = 9;
+  int64 sinceStartReceivedUncompressedBytes = 10;
+  int64 sinceStartSentCompressedBytes = 11;
+  int64 sinceStartReceivedCompressedBytes = 12;
+  bool profileActive = 13;
+  int64 sinceProfileSentPackets = 14;
+  int64 sinceProfileReceivedPackets = 15;
+  int64 sinceProfileSentUncompressedBytes = 16;
+  int64 sinceProfileReceivedUncompressedBytes = 17;
+  int64 sinceProfileSentCompressedBytes = 18;
+  int64 sinceProfileReceivedCompressedBytes = 19;
+}
+
+message CpuProfileData {
+  int64 startTimeMillis = 1;
+  int64 endTimeMillis = 2;
+  int32 samplingIntervalMs = 3;
+  repeated StackSample samples = 4;
+  map<string, int64> methodHotspots = 5;
+  map<string, double> methodTimeMs = 6;
+  map<string, double> methodPercentages = 7;
+}
+
+message StackSample {
+  int64 timestampMillis = 1;
+  string threadName = 2;
+  int64 threadId = 3;
+  repeated StackFrame stackTrace = 4;
+  int64 sampleCount = 5;
+}
+
+message StackFrame {
+  string className = 1;
+  string methodName = 2;
+  string fileName = 3;
+  int32 lineNumber = 4;
+}
