@@ -2,9 +2,8 @@
 
 A comprehensive performance monitoring and profiling plugin for Hytale servers that provides real-time diagnostics and historical profiling data.
 
-## Note
-
-This project is still in early stages, much like Hytale. Things may not work properly, and there may be some bugs.
+> [!WARNING]  
+> This project is still in early development.
 
 ## Features
 
