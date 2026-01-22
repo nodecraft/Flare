@@ -59,8 +59,8 @@ repositories {
 }
 
 dependencies {
-    implementation("com.hypixel.hytale:Server:2026.01.22-6f8bdbdc4")
-    implementation("com.google.code.gson:gson:2.10.1")
+    compileOnly("com.hypixel.hytale:Server:2026.01.22-6f8bdbdc4")
+    compileOnly("com.google.code.gson:gson:2.10.1")
     implementation("com.google.protobuf:protobuf-java:3.25.3")
     
     // AP-Loader: Bundles async-profiler with native libraries for all platforms
