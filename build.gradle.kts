@@ -49,6 +49,9 @@ sourceSets {
 repositories {
     mavenLocal()
     mavenCentral()
+    maven {
+        url = uri("https://maven.hytale.com/pre-release")
+    }
     // Local libs directory for HytaleServer JAR
     flatDir {
         dirs("libs")
@@ -56,16 +59,8 @@ repositories {
 }
 
 dependencies {
-    // Use local JAR file if available, otherwise try Maven dependency
-    val hytaleServerJar = file("libs/HytaleServer.jar")
-    if (hytaleServerJar.exists()) {
-        compileOnly(files(hytaleServerJar))
-        println("Using local HytaleServer.jar from libs/")
-    } else {
-        // Fallback to Maven dependency (requires it to be installed in local Maven repo)
-        compileOnly("com.hypixel.hytale:HytaleServer-parent:1.0-SNAPSHOT")
-    }
-    implementation("com.google.code.gson:gson:2.10.1")
+    compileOnly("com.hypixel.hytale:Server:2026.01.22-6f8bdbdc4")
+    compileOnly("com.google.code.gson:gson:2.10.1")
     implementation("com.google.protobuf:protobuf-java:3.25.3")
     
     // AP-Loader: Bundles async-profiler with native libraries for all platforms
