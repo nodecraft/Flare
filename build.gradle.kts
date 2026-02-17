@@ -33,6 +33,30 @@ val serverRunDir = file("run")
 // Ensure it exists
 serverRunDir.mkdirs()
 
+var resolvedServerVersion: String? = null
+
+fun resolveServerVersion(): String? {
+    if (resolvedServerVersion != null) {
+        return resolvedServerVersion
+    }
+
+    val artifact = configurations
+        .findByName("compileClasspath")
+        ?.resolvedConfiguration
+        ?.resolvedArtifacts
+        ?.find { cand ->
+            cand.moduleVersion.id.group == "com.hypixel.hytale" && cand.name == "Server"
+        }
+
+    if (artifact == null) {
+        resolvedServerVersion = ""
+        logger.lifecycle("Failed to resolve HytaleServer version")
+    }
+
+    resolvedServerVersion = artifact?.moduleVersion?.id?.version
+    return resolvedServerVersion
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
@@ -50,7 +74,7 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven {
-        url = uri("https://maven.hytale.com/pre-release")
+        url = uri("https://maven.hytale.com/release")
     }
     // Local libs directory for HytaleServer JAR
     flatDir {
@@ -59,7 +83,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.hypixel.hytale:Server:2026.01.22-6f8bdbdc4")
+    compileOnly("com.hypixel.hytale:Server:2026.02.17-255364b8e")
     compileOnly("com.google.code.gson:gson:2.10.1")
     implementation("com.google.protobuf:protobuf-java:3.25.3")
     
@@ -78,9 +102,14 @@ protobuf {
 tasks {
 
     processResources {
+        val serverVer = resolveServerVersion() ?: ""
         inputs.property("version", project.version)
+        inputs.property("serverVersion", serverVer)
         filesMatching("manifest.json") {
-            expand("project" to mapOf("version" to project.version))
+            expand(
+                "project" to mapOf("version" to project.version),
+                "serverVersion" to serverVer
+            )
         }
     }
 

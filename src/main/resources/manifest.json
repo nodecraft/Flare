@@ -11,5 +11,5 @@
   ],
   "Website": "https://nodecraft.com",
   "Main": "com.nodecraft.hytale.flare.FlarePlugin",
-  "ServerVersion": "*"
+  "ServerVersion": "${serverVersion}"
 }
