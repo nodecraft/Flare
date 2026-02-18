@@ -83,7 +83,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly("com.hypixel.hytale:Server:2026.02.17-255364b8e")
+    compileOnly("com.hypixel.hytale:Server:latest.release")
     compileOnly("com.google.code.gson:gson:2.10.1")
     implementation("com.google.protobuf:protobuf-java:3.25.3")
     
