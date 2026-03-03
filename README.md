@@ -2,8 +2,8 @@
 
 A comprehensive performance monitoring and profiling plugin for Hytale servers that provides real-time diagnostics and historical profiling data.
 
-> [!WARNING]  
-> This project is still in early development.
+> [!IMPORTANT]  
+> This project has been archived and is no longer maintained. We recommend using [Spark](https://www.curseforge.com/hytale/mods/spark) instead. 
 
 ## Features
 
