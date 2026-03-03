@@ -122,9 +122,13 @@ jobs:
           fi
 
           echo "Removing existing assets from release $TAG so it contains only our JAR."
-          for id in $(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].id'); do
-            gh api -X DELETE "/repos/${REPO}/releases/assets/${id}"
-          done
+          ASSET_IDS=$(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].id' 2>/dev/null || true)
+          if [[ -n "$ASSET_IDS" ]]; then
+            while read -r id; do
+              [[ -z "$id" ]] && continue
+              gh api -X DELETE "/repos/${REPO}/releases/assets/${id}"
+            done <<< "$ASSET_IDS"
+          fi
 
           gh release upload "$TAG" "$ASSET" --repo "$REPO"
           echo "Uploaded $ASSET to release $TAG"
