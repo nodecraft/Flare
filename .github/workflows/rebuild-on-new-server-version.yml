@@ -1,0 +1,173 @@
+name: Rebuild on new Server Version
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      needs_build: ${{ steps.compare.outputs.needs_build }}
+      current_server_version: ${{ steps.hytale-version.outputs.current_server_version }}
+    steps:
+      - name: Fetch latest Hytale Server version
+        id: hytale-version
+        run: |
+          echo "Fetching latest Hytale Server version from maven.hytale.com..."
+          METADATA_URL="https://maven.hytale.com/release/com/hypixel/hytale/Server/maven-metadata.xml"
+
+          METADATA=$(curl -sf "$METADATA_URL") || {
+            echo "ERROR: Failed to fetch maven-metadata.xml from $METADATA_URL"
+            exit 1
+          }
+
+          SERVER_VERSION=$(echo "$METADATA" | grep -oP '(?<=<release>)[^<]+' | head -1)
+
+          if [[ -z "$SERVER_VERSION" ]]; then
+            echo "ERROR: Could not parse Hytale Server version from maven-metadata.xml"
+            echo "Metadata content:"
+            echo "$METADATA"
+            exit 1
+          fi
+
+          echo "current_server_version=$SERVER_VERSION" >> $GITHUB_OUTPUT
+          echo "Current Hytale Server version: $SERVER_VERSION"
+
+      - uses: actions/checkout@v4
+
+      - name: Read last built server version
+        id: last-version
+        run: |
+          if [[ -f .github/last-server-version.txt ]]; then
+            LAST_VERSION=$(cat .github/last-server-version.txt | tr -d '\n\r' | xargs)
+          else
+            LAST_VERSION=""
+          fi
+          echo "last_version<<EOF" >> $GITHUB_OUTPUT
+          echo "$LAST_VERSION" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Last built server version: '${LAST_VERSION}'"
+
+      - name: Check if build is needed
+        id: compare
+        run: |
+          CURRENT="${{ steps.hytale-version.outputs.current_server_version }}"
+          LAST="${{ steps.last-version.outputs.last_version }}"
+
+          echo "Comparing current ($CURRENT) vs last built ($LAST)..."
+
+          if [[ -z "$LAST" || "$CURRENT" != "$LAST" ]]; then
+            echo "Server version changed or unknown. Build required."
+            echo "needs_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "Server version unchanged. No build needed."
+            echo "needs_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.needs_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      project_version: ${{ steps.project-version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: "temurin"
+          cache: gradle
+
+      - name: Ensure executable
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew build --no-daemon
+
+      - name: Get project version
+        id: project-version
+        run: |
+          VERSION=$(./gradlew properties -q --no-daemon 2>/dev/null | grep '^version:' | sed 's/version: //' | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Project version: $VERSION"
+
+      - name: Prepare artifact with server version
+        run: |
+          VERSION="${{ steps.project-version.outputs.version }}"
+          SERVER_VERSION="${{ needs.check.outputs.current_server_version }}"
+          cp "build/libs/Flare-${VERSION}.jar" "flare-${VERSION}-${SERVER_VERSION}.jar"
+          echo "Created flare-${VERSION}-${SERVER_VERSION}.jar"
+
+      - name: Upload artifact to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.project-version.outputs.version }}"
+          SERVER_VERSION="${{ needs.check.outputs.current_server_version }}"
+          ASSET="flare-${VERSION}-${SERVER_VERSION}.jar"
+          TAG="v${VERSION}"
+          REPO="${{ github.repository }}"
+
+          if ! gh release view "$TAG" --repo "$REPO" 2>/dev/null; then
+            echo "Release $TAG not found. Creating it."
+            gh release create "$TAG" --generate-notes --repo "$REPO"
+          fi
+
+          echo "Removing existing assets from release $TAG so it contains only our JAR."
+          for id in $(gh release view "$TAG" --repo "$REPO" --json assets -q '.assets[].id'); do
+            gh api -X DELETE "/repos/${REPO}/releases/assets/${id}"
+          done
+
+          gh release upload "$TAG" "$ASSET" --repo "$REPO"
+          echo "Uploaded $ASSET to release $TAG"
+
+      - name: Upload JAR for CurseForge publish
+        uses: actions/upload-artifact@v4
+        with:
+          name: flare-jar
+          path: flare-${{ steps.project-version.outputs.version }}-${{ needs.check.outputs.current_server_version }}.jar
+
+      - name: Update last-server-version.txt
+        run: |
+          echo "${{ needs.check.outputs.current_server_version }}" > .github/last-server-version.txt
+
+      - name: Commit and push last-server-version.txt
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/last-server-version.txt
+          if git diff --staged --quiet; then
+            echo "No change to last-server-version.txt"
+          else
+            git commit -m "chore(ci): update last built Hytale server version to ${{ needs.check.outputs.current_server_version }}"
+            git push
+          fi
+
+  # Publishes the built JAR to CurseForge. Requires secrets: CURSEFORGE_PROJECT_ID, CURSEFORGE_TOKEN.
+  publish-curseforge:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download Flare JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: flare-jar
+
+      - name: Publish to CurseForge
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: flare-jar/*.jar
+          version: ${{ needs.build.outputs.project_version }}+${{ needs.check.outputs.current_server_version }}
+          name: Flare ${{ needs.build.outputs.project_version }} (Hytale server ${{ needs.check.outputs.current_server_version }})
